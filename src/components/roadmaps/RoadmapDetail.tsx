@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Clock, Calendar, ChevronDown, ChevronUp, CheckCircle, Circle, CheckCheck } from "lucide-react";
+import { Clock, Calendar, ChevronDown, ChevronUp, CheckCircle, Circle, CheckCheck, BookOpen } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
@@ -112,6 +112,7 @@ interface RoadmapDetailProps {
     total_weeks: number;
     current_week: number;
     progress: number;
+    created_at?: string; // Make created_at optional since it might not always be available
   };
 }
 
@@ -174,7 +175,7 @@ export default function RoadmapDetail({ roadmap }: RoadmapDetailProps) {
           
           <div className="flex items-center">
             <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-            <span>Started {new Date(roadmap.created_at).toLocaleDateString()}</span>
+            <span>Started {roadmap.created_at ? new Date(roadmap.created_at).toLocaleDateString() : "Recently"}</span>
           </div>
         </div>
         
@@ -254,7 +255,7 @@ export default function RoadmapDetail({ roadmap }: RoadmapDetailProps) {
                                   ) : resource.type === "quiz" ? (
                                     <CheckCheck className="h-5 w-5 text-muted-foreground" />
                                   ) : (
-                                    <Book className="h-5 w-5 text-muted-foreground" />
+                                    <BookOpen className="h-5 w-5 text-muted-foreground" />
                                   )}
                                 </div>
                                 
