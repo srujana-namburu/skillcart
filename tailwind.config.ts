@@ -86,6 +86,14 @@ export default {
 					800: '#343A40',
 					900: '#212529',
 				},
+				// New colors for badges and gamification
+				bronze: '#CD7F32',
+				silver: '#C0C0C0',
+				gold: '#FFD700',
+				emerald: {
+					500: '#10B981',
+					600: '#059669',
+				},
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -128,7 +136,31 @@ export default {
 				'pulse-subtle': {
 					'0%, 100%': { opacity: '1' },
 					'50%': { opacity: '0.7' }
-				}
+				},
+				// New animations for gamification
+				'confetti-drop': {
+					'0%': { transform: 'translateY(-10px)', opacity: '0' },
+					'50%': { transform: 'translateY(0)', opacity: '1' },
+					'90%': { transform: 'translateY(5px)', opacity: '1' },
+					'100%': { transform: 'translateY(10px)', opacity: '0' }
+				},
+				'badge-pop': {
+					'0%': { transform: 'scale(0)', opacity: '0' },
+					'70%': { transform: 'scale(1.1)', opacity: '1' },
+					'100%': { transform: 'scale(1)', opacity: '1' }
+				},
+				'float-up': {
+					'0%': { transform: 'translateY(0)', opacity: '1' },
+					'100%': { transform: 'translateY(-20px)', opacity: '0' }
+				},
+				'glow-pulse': {
+					'0%, 100%': { boxShadow: '0 0 5px rgba(93, 63, 211, 0.4)' },
+					'50%': { boxShadow: '0 0 20px rgba(93, 63, 211, 0.8)' }
+				},
+				'draw-check': {
+					'0%': { 'stroke-dashoffset': '60' },
+					'100%': { 'stroke-dashoffset': '0' }
+				},
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
@@ -139,7 +171,13 @@ export default {
 				'slide-out': 'slide-out 0.3s ease-out',
 				'scale-in': 'scale-in 0.2s ease-out',
 				'spin-slow': 'spin-slow 6s linear infinite',
-				'pulse-subtle': 'pulse-subtle 2s ease-in-out infinite'
+				'pulse-subtle': 'pulse-subtle 2s ease-in-out infinite',
+				// New animations for gamification
+				'confetti-drop': 'confetti-drop 1.5s forwards',
+				'badge-pop': 'badge-pop 0.5s ease-out forwards',
+				'float-up': 'float-up 1s ease-out forwards',
+				'glow-pulse': 'glow-pulse 2s infinite',
+				'draw-check': 'draw-check 0.5s ease forwards',
 			},
 			fontFamily: {
 				sans: ['Inter', 'sans-serif'],
@@ -149,6 +187,10 @@ export default {
 				'gradient-primary': 'linear-gradient(135deg, #5D3FD3, #20B2AA)',
 				'gradient-primary-hover': 'linear-gradient(135deg, #4B32A8, #198F89)',
 				'gradient-dark': 'linear-gradient(135deg, #1A1B25, #262838)',
+				// New gradients for badges
+				'gradient-bronze': 'linear-gradient(135deg, #CD7F32, #E9BE7D)',
+				'gradient-silver': 'linear-gradient(135deg, #C0C0C0, #E8E8E8)',
+				'gradient-gold': 'linear-gradient(135deg, #FFD700, #FFC107)',
 			},
 		}
 	},
