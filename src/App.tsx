@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Roadmaps from "./pages/Roadmaps";
 import About from "./pages/About";
 import Profile from "./pages/Profile";
+import ProfileSettings from "./pages/ProfileSettings";
 import NotFound from "./pages/NotFound";
 
 // Create a new QueryClient instance
@@ -34,6 +35,7 @@ function App() {
               <Route path="/roadmaps" element={<Roadmaps />} />
               <Route path="/about" element={<About />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/settings" element={<ProfileSettings />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

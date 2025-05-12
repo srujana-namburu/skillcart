@@ -15,7 +15,27 @@ import { Calendar, Clock, Code, Book, Flame, ArrowRight, Calendar as CalendarIco
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
+import { UserProfile } from "@/types/profile";
 import { useToast } from "@/hooks/use-toast";
+
+// Define types for Roadmap data
+
+interface Roadmap {
+  id: string;
+  title: string;
+  description: string;
+  skill_id: string;
+  total_weeks: number;
+  current_week: number;
+  progress: number;
+  created_at: string;
+  updated_at: string;
+  icon: any; // This will be a component
+  lastAccessed: string;
+  match_score?: number; // For recommendations
+  currentWeek?: number; // Alias for current_week for backward compatibility
+  totalWeeks?: number; // Alias for total_weeks for backward compatibility
+}
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
@@ -26,8 +46,95 @@ export default function Dashboard() {
   const [dailyGoalProgress, setDailyGoalProgress] = useState(0);
   const [dailyGoalTarget, setDailyGoalTarget] = useState(30); // minutes
   const [streakCount, setStreakCount] = useState(0);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [hasProfileSetup, setHasProfileSetup] = useState(true);
+  const [isProfileSetupOpen, setIsProfileSetupOpen] = useState(false);
+  const [recommendedRoadmaps, setRecommendedRoadmaps] = useState<Roadmap[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Function to fetch recommended roadmaps based on user interests
+  const fetchRecommendedRoadmaps = async (interests: string[]) => {
+    try {
+      if (!interests || interests.length === 0) return;
+      
+      // Fetch all available roadmaps
+      const { data: roadmapsData, error } = await supabase
+        .from('roadmaps')
+        .select('*');
+      
+      if (error) {
+        console.error('Error fetching roadmaps:', error);
+        return;
+      }
+      
+      if (!roadmapsData || roadmapsData.length === 0) return;
+      
+      // Calculate match score for each roadmap based on user interests
+      const roadmapsWithScores = roadmapsData.map((roadmap) => {
+        // Simple algorithm: check if roadmap skill_id matches any user interest
+        const matchesInterest = interests.includes(roadmap.skill_id);
+        
+        // Assign a score based on match (can be enhanced with more sophisticated algorithms)
+        const matchScore = matchesInterest ? 100 : 0;
+        
+        // Create a proper Roadmap object with all required fields
+        const enhancedRoadmap: Roadmap = {
+          id: roadmap.id,
+          title: roadmap.title,
+          description: roadmap.description || '',
+          skill_id: roadmap.skill_id,
+          total_weeks: roadmap.total_weeks,
+          current_week: roadmap.current_week,
+          progress: 0, // Default progress value
+          created_at: roadmap.created_at,
+          updated_at: roadmap.updated_at,
+          match_score: matchScore,
+          lastAccessed: new Date(roadmap.updated_at).toLocaleDateString(),
+          currentWeek: roadmap.current_week,
+          totalWeeks: roadmap.total_weeks,
+          icon: getIconForSkill(roadmap.skill_id)
+        };
+        
+        return enhancedRoadmap;
+      });
+      
+      // Sort by match score (highest first)
+      const sortedRoadmaps = roadmapsWithScores.sort((a, b) => 
+        (b.match_score || 0) - (a.match_score || 0)
+      );
+      
+      // Take top 4 recommendations
+      const topRecommendations = sortedRoadmaps.slice(0, 4);
+      setRecommendedRoadmaps(topRecommendations);
+      
+      // If user has no current roadmaps and we have recommendations, use the top recommendation
+      if (currentRoadmaps.length === 0 && topRecommendations.length > 0) {
+        setCurrentRoadmaps([topRecommendations[0]]);
+      }
+    } catch (error) {
+      console.error('Error generating recommendations:', error);
+    }
+  };
+  
+  // Helper function to get icon component based on skill_id
+  const getIconForSkill = (skillId: string) => {
+    // Map skill IDs to icon components
+    const skillIconMap: Record<string, any> = {
+      'web-dev': Code,
+      'data-science': Book,
+      'mobile-dev': Code,
+      'ui-ux': Book,
+      'machine-learning': Book,
+      'devops': Code,
+      'cloud': Code,
+      'cybersecurity': Code,
+      'blockchain': Code,
+      'game-dev': Code
+    };
+    
+    return skillIconMap[skillId] || Book; // Default to Book icon
+  };
   
   // Weekly progress data
   const [weeklyProgress, setWeeklyProgress] = useState([
@@ -41,7 +148,7 @@ export default function Dashboard() {
   ]);
   
   // User roadmaps
-  const [currentRoadmaps, setCurrentRoadmaps] = useState([]);
+  const [currentRoadmaps, setCurrentRoadmaps] = useState<Roadmap[]>([]);
   
   useEffect(() => {
     const fetchUserData = async () => {
@@ -58,26 +165,62 @@ export default function Dashboard() {
         }
         
         // Fetch user data
-        const { data: userData, error: userError } = await supabase
+        const { data: userData, error } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single();
+          
+        if (error) {
+          console.error('Error fetching user data:', error);
+          return;
+        }
         
-        if (userError) {
-          console.error('Error fetching user data:', userError);
-          // If no user record exists, try to use metadata from auth
-          setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || "User");
-        } else if (userData) {
-          // Set user data from database
-          setUserName(userData.display_name || session.user.user_metadata?.name || "User");
-          // Use default values for fields that might not exist in the database
+        if (userData) {
+          setUserName(userData.display_name || session.user.email?.split('@')[0] || 'User');
           setUserLevel(1); // Default level
           setUserXP(userData.xp_points || 0);
           setNextLevelXP(250); // Default next level XP
           setDailyGoalProgress(0); // Default daily progress
-          setDailyGoalTarget(30); // Default daily goal in minutes
           setStreakCount(userData.streak_count || 0);
+        }
+        
+        // Fetch user profile data
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+          
+        if (profileError) {
+          console.log('User profile not found, user needs to complete profile setup');
+          setHasProfileSetup(false);
+          setUserProfile(null);
+        } else if (profileData) {
+          // Set user profile data
+          const userProfile: UserProfile = {
+            id: profileData.id,
+            user_id: profileData.user_id,
+            interests: profileData.interests || [],
+            primary_goal: profileData.primary_goal || '',
+            weekly_time_hours: profileData.weekly_time_hours || 5,
+            additional_goals: profileData.additional_goals,
+            created_at: profileData.created_at,
+            updated_at: profileData.updated_at
+          };
+          
+          setUserProfile(userProfile);
+          setHasProfileSetup(true);
+          
+          // Adjust daily goal target based on weekly time availability
+          const weeklyHours = profileData.weekly_time_hours || 5;
+          const dailyMinutes = Math.round((weeklyHours * 60) / 7); // Convert to daily minutes
+          setDailyGoalTarget(dailyMinutes);
+          
+          // Fetch recommended roadmaps based on user interests
+          if (profileData.interests && profileData.interests.length > 0) {
+            await fetchRecommendedRoadmaps(profileData.interests);
+          }
         }
         
         // Generate more realistic weekly progress data based on current day
@@ -291,6 +434,7 @@ export default function Dashboard() {
           </Card>
         </div>
         
+        {/* Current Learning Section */}
         <h2 className="text-2xl font-display font-bold mt-10 mb-6">Continue Learning</h2>
         
         {currentRoadmaps.length > 0 ? (
@@ -324,7 +468,7 @@ export default function Dashboard() {
                     </div>
                     
                     <div className="flex justify-between items-center mt-4">
-                      <span className="text-sm text-muted-foreground">Week {roadmap.currentWeek} of {roadmap.totalWeeks}</span>
+                      <span className="text-sm text-muted-foreground">Week {roadmap.currentWeek || roadmap.current_week} of {roadmap.totalWeeks || roadmap.total_weeks}</span>
                       <Button variant="outline" size="sm" className="btn-hover">
                         Continue <ArrowRight className="ml-1 h-4 w-4" />
                       </Button>
@@ -347,6 +491,76 @@ export default function Dashboard() {
               </Button>
             </Link>
           </div>
+        )}
+        
+        {/* Personalized Recommendations Section */}
+        {userProfile && recommendedRoadmaps.length > 0 && (
+          <>
+            <h2 className="text-2xl font-display font-bold mt-12 mb-2">Recommended For You</h2>
+            <p className="text-muted-foreground mb-6">
+              Based on your interests in {userProfile.interests.map(i => i.replace('-', ' ')).join(', ')}
+            </p>
+            
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {recommendedRoadmaps.map((roadmap) => (
+                <Card key={roadmap.id} className="skill-card overflow-hidden border-2 hover:border-primary/50 transition-all">
+                  <CardHeader>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <roadmap.icon className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle>{roadmap.title}</CardTitle>
+                        <CardDescription>
+                          {roadmap.match_score === 100 ? (
+                            <span className="text-green-600 font-medium">Perfect match!</span>
+                          ) : (
+                            <span>Recommended for you</span>
+                          )}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">{roadmap.description}</p>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{roadmap.total_weeks} weeks</span>
+                      <Button variant="outline" size="sm" className="btn-hover">
+                        Start Learning <ArrowRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
+        
+        {/* Profile Setup Prompt if user hasn't completed profile setup */}
+        {!hasProfileSetup && (
+          <Card className="mt-12 border-2 border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle>Complete Your Profile Setup</CardTitle>
+              <CardDescription>
+                Tell us about your interests and learning goals to get personalized recommendations
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Setting up your profile helps us tailor your learning experience to your specific needs and interests.
+                </p>
+                <Button 
+                  className="bg-gradient-primary hover:bg-gradient-primary-hover whitespace-nowrap"
+                  onClick={() => setIsProfileSetupOpen(true)}
+                >
+                  Setup Profile
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </main>
     </div>
