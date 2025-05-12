@@ -1,42 +1,145 @@
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [session, setSession] = useState(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  // Check for existing session on load
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      setSession(currentSession);
+      if (currentSession) {
+        navigate('/dashboard');
+      }
+    });
+    
+    // Check for existing session
+    const checkSession = async () => {
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      if (existingSession) {
+        navigate('/dashboard');
+      }
+    };
+    
+    checkSession();
+    
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Demo signup functionality
+    if (!email || !password || !name) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+          },
+        },
+      });
       
-      if (email && password && name) {
-        toast({
-          title: "Account created!",
-          description: "Welcome to SkillKart",
-        });
-      } else {
-        toast({
-          title: "Signup failed",
-          description: "Please check your information and try again",
-          variant: "destructive",
-        });
+      if (error) {
+        throw error;
       }
-    }, 1500);
+      
+      toast({
+        title: "Account created!",
+        description: "Welcome to SkillKart. Check your email to verify your account.",
+      });
+      
+      // Navigation is handled by the auth state listener
+    } catch (error: any) {
+      toast({
+        title: "Signup failed",
+        description: error.message || "Please check your information and try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Signup failed",
+        description: error.message || "Could not sign up with Google",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
+  };
+
+  const handleGithubSignUp = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Signup failed",
+        description: error.message || "Could not sign up with GitHub",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -97,7 +200,7 @@ export default function Signup() {
                   required 
                 />
                 <p className="text-xs text-muted-foreground">
-                  Password must be at least 8 characters long
+                  Password must be at least 6 characters long
                 </p>
               </div>
             </CardContent>
@@ -119,10 +222,22 @@ export default function Signup() {
               </div>
               
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" type="button" className="btn-hover">
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  className="btn-hover"
+                  onClick={handleGoogleSignUp}
+                  disabled={isLoading}
+                >
                   Google
                 </Button>
-                <Button variant="outline" type="button" className="btn-hover">
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  className="btn-hover"
+                  onClick={handleGithubSignUp}
+                  disabled={isLoading}
+                >
                   GitHub
                 </Button>
               </div>
