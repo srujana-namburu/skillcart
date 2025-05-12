@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -112,11 +111,12 @@ interface RoadmapDetailProps {
     total_weeks: number;
     current_week: number;
     progress: number;
-    created_at?: string; // Make created_at optional since it might not always be available
+    created_at?: string; // Optional since it might not always be available
   };
+  onResourceComplete?: () => void; // Add this prop to the interface
 }
 
-export default function RoadmapDetail({ roadmap }: RoadmapDetailProps) {
+export default function RoadmapDetail({ roadmap, onResourceComplete }: RoadmapDetailProps) {
   const [openWeeks, setOpenWeeks] = useState<Record<string, boolean>>({
     // Default to open the current week
     [`w${roadmap.current_week}`]: true
@@ -159,6 +159,11 @@ export default function RoadmapDetail({ roadmap }: RoadmapDetailProps) {
   const markResourceComplete = (weekId, stepId, resourceId, isCompleted) => {
     console.log(`Resource ${resourceId} in step ${stepId} of week ${weekId} marked as ${isCompleted ? 'complete' : 'incomplete'}`);
     // In a real application, this would update the database
+    
+    // Call the onResourceComplete callback if provided and marking as complete
+    if (isCompleted && onResourceComplete) {
+      onResourceComplete();
+    }
   };
 
   return (
