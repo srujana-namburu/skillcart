@@ -13,89 +13,78 @@ import { LevelProgress } from "@/components/gamification/LevelProgress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, BadgeType } from "@/components/gamification/Badge";
 
-// Mock roadmap data - would come from API/database
-const mockRoadmaps = [
-  {
-    id: "1",
-    title: "Web Development Fundamentals",
-    description: "Learn the core fundamentals of modern web development",
-    skill_id: "web-dev",
-    total_weeks: 8,
-    current_week: 3,
-    progress: 35,
-    created_at: "2025-04-15T10:30:00Z",
-    updated_at: "2025-05-10T14:22:00Z",
-    icon: "code",
-  },
-  {
-    id: "2",
-    title: "Data Science Basics",
-    description: "Master the foundational concepts of data science",
-    skill_id: "data-science",
-    total_weeks: 12,
-    current_week: 2,
-    progress: 15,
-    created_at: "2025-04-01T08:15:00Z",
-    updated_at: "2025-05-09T16:45:00Z",
-    icon: "book",
-  }
-];
+// Define types for our data
+interface Roadmap {
+  id: string;
+  title: string;
+  description: string;
+  skill_id: string;
+  total_weeks: number;
+  current_week: number;
+  progress: number;
+  created_at: string;
+  updated_at: string;
+  icon: string;
+}
 
-// Mock user progress data
-const userProgressData = {
-  level: 2,
-  currentXP: 350,
-  requiredXP: 500,
-  streakDays: 5,
-  recentBadges: [
-    {
-      id: "b1",
-      type: "streak" as BadgeType,
-      name: "5-Day Streak",
-      description: "Completed learning activities for 5 consecutive days",
-      tier: "bronze" as const,
-      earned: true,
-    },
-    {
-      id: "b2",
-      type: "mastery" as BadgeType,
-      name: "Getting Started",
-      description: "Created your first learning roadmap",
-      tier: "bronze" as const,
-      earned: true,
-    },
-  ]
-};
+interface Badge {
+  id: string;
+  type: BadgeType;
+  name: string;
+  description: string;
+  tier: 'bronze' | 'silver' | 'gold';
+  earned: boolean;
+}
+
+interface UserProgress {
+  level: number;
+  currentXP: number;
+  requiredXP: number;
+  streakDays: number;
+  recentBadges: Badge[];
+}
 
 export default function Roadmaps() {
   const [isLoading, setIsLoading] = useState(true);
-  const [roadmaps, setRoadmaps] = useState([]);
-  const [selectedRoadmap, setSelectedRoadmap] = useState(null);
+  const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
+  const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showXPNotification, setShowXPNotification] = useState(false);
   const [xpAmount, setXpAmount] = useState(0);
   const [xpReason, setXpReason] = useState("");
+  const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const { toast } = useToast();
 
-  // Simulating API data fetch
+  // Fetch roadmaps and user progress data
   useEffect(() => {
-    // This would be an actual API call in production
-    const fetchRoadmaps = async () => {
+    const fetchData = async () => {
       try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        setIsLoading(true);
         
-        // Set the mock data
-        setRoadmaps(mockRoadmaps);
+        // Fetch roadmaps from API
+        const roadmapsResponse = await fetch('/api/roadmaps');
+        if (!roadmapsResponse.ok) {
+          throw new Error('Failed to fetch roadmaps');
+        }
+        const roadmapsData = await roadmapsResponse.json();
+        setRoadmaps(roadmapsData);
+        
+        // Fetch user progress from API
+        const userProgressResponse = await fetch('/api/user/progress');
+        if (!userProgressResponse.ok) {
+          throw new Error('Failed to fetch user progress');
+        }
+        const userProgressData = await userProgressResponse.json();
+        setUserProgress(userProgressData);
         
         // If there are roadmaps, select the first one by default
-        if (mockRoadmaps.length > 0) {
-          setSelectedRoadmap(mockRoadmaps[0]);
+        if (roadmapsData.length > 0) {
+          setSelectedRoadmap(roadmapsData[0]);
         }
       } catch (error) {
-        console.error("Error fetching roadmaps:", error);
+        console.error("Error fetching data:", error);
         toast({
-          title: "Failed to load roadmaps",
+          title: "Failed to load data",
           description: "Please try again later",
           variant: "destructive",
         });
@@ -104,7 +93,7 @@ export default function Roadmaps() {
       }
     };
 
-    fetchRoadmaps();
+    fetchData();
   }, [toast]);
 
   const handleRoadmapSelect = (roadmap) => {
@@ -190,30 +179,38 @@ export default function Roadmaps() {
               </CardHeader>
               <CardContent>
                 {/* Compact Level Progress */}
-                <LevelProgress 
-                  level={userProgressData.level}
-                  currentXP={userProgressData.currentXP}
-                  requiredXP={userProgressData.requiredXP}
-                  compact={true}
-                />
+                {userProgress ? (
+                  <LevelProgress 
+                    level={userProgress.level}
+                    currentXP={userProgress.currentXP}
+                    requiredXP={userProgress.requiredXP}
+                    compact={true}
+                  />
+                ) : (
+                  <Skeleton className="h-8 w-full rounded-md" />
+                )}
                 
                 {/* Streak */}
                 <div className="mt-4 flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Current Streak</span>
-                  <div className="flex items-center gap-1">
-                    <span className="font-medium">{userProgressData.streakDays} days</span>
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber/20">
-                      <Zap className="h-3 w-3 text-amber" />
+                  {userProgress ? (
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">{userProgress.streakDays} days</span>
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber/20">
+                        <Zap className="h-3 w-3 text-amber" />
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <Skeleton className="h-6 w-16 rounded-md" />
+                  )}
                 </div>
                 
                 {/* Recent Badges */}
-                {userProgressData.recentBadges.length > 0 && (
+                {userProgress && userProgress.recentBadges.length > 0 ? (
                   <div className="mt-4">
                     <h4 className="mb-2 text-sm font-medium">Recent Badges</h4>
                     <div className="flex gap-3">
-                      {userProgressData.recentBadges.map(badge => (
+                      {userProgress.recentBadges.map(badge => (
                         <Badge
                           key={badge.id}
                           type={badge.type}
@@ -224,6 +221,16 @@ export default function Roadmaps() {
                         />
                       ))}
                     </div>
+                  </div>
+                ) : userProgress ? (
+                  <div className="mt-4">
+                    <h4 className="mb-2 text-sm font-medium">Recent Badges</h4>
+                    <p className="text-sm text-muted-foreground">No badges earned yet</p>
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <Skeleton className="h-4 w-32 mb-2 rounded-md" />
+                    <Skeleton className="h-10 w-full rounded-md" />
                   </div>
                 )}
                 

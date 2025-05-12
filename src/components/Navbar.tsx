@@ -3,13 +3,80 @@ import { Link } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "react-router-dom";
-import { useState } from "react";
-import { X, Menu, Bell, ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Menu, Bell, ChevronDown, User, LogOut, Home, Settings } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const location = useLocation();
-  const isAuthenticated = false; // We'll replace this with actual auth logic later
+  
+  useEffect(() => {
+    // Check for authentication status when component mounts
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+      
+      if (session?.user) {
+        // Get user profile data
+        const { data: userData } = await supabase
+          .from('users')
+          .select('display_name')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (userData?.display_name) {
+          setUserName(userData.display_name);
+        } else {
+          // Fallback to user metadata if available
+          setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || "");
+        }
+      }
+    };
+    
+    checkAuth();
+    
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+      
+      if (session?.user) {
+        // Update user name when auth state changes
+        const fetchUserData = async () => {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('display_name')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (userData?.display_name) {
+            setUserName(userData.display_name);
+          } else {
+            // Fallback to user metadata
+            setUserName(session.user.user_metadata?.name || session.user.email?.split('@')[0] || "");
+          }
+        };
+        
+        fetchUserData();
+      } else {
+        setUserName("");
+      }
+    });
+    
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, []);
   
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   
@@ -33,6 +100,13 @@ export function Navbar() {
           </Link>
           
           <nav className="hidden md:flex items-center gap-6">
+            <Link 
+              to="/dashboard" 
+              className={`nav-link ${isActivePath("/dashboard") ? "nav-link-active" : ""}`}
+            >
+              <Home className="h-4 w-4 mr-1" />
+              Home
+            </Link>
             <Link 
               to="/roadmaps" 
               className={`nav-link ${isActivePath("/roadmaps") ? "nav-link-active" : ""}`}
@@ -70,17 +144,49 @@ export function Navbar() {
                 </span>
               </Button>
               
-              <div className="relative flex items-center">
-                <Button 
-                  variant="ghost" 
-                  className="flex items-center gap-2 rounded-full animate-hover"
-                  onClick={toggleMenu}
-                >
-                  <div className="h-8 w-8 rounded-full bg-gradient-primary" />
-                  <span className="hidden sm:inline">Jane Doe</span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </div>
+              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    className="flex items-center gap-2 rounded-full animate-hover"
+                  >
+                    <div className="h-8 w-8 rounded-full bg-gradient-primary" />
+                    <span className="hidden sm:inline">{userName || "User"}</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="flex items-center cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard" className="flex items-center cursor-pointer">
+                      <Home className="mr-2 h-4 w-4" />
+                      <span>Dashboard</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/settings" className="flex items-center cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="flex items-center cursor-pointer text-destructive focus:text-destructive"
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      window.location.href = "/";
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           ) : (
             <div className="hidden sm:flex items-center gap-2">
@@ -110,6 +216,18 @@ export function Navbar() {
             <ul className="flex flex-col space-y-4">
               <li>
                 <Link 
+                  to="/dashboard" 
+                  className={`block p-4 rounded-lg ${isActivePath("/dashboard") ? "bg-primary/10 text-primary" : ""}`}
+                  onClick={toggleMenu}
+                >
+                  <div className="flex items-center">
+                    <Home className="h-5 w-5 mr-2" />
+                    Home
+                  </div>
+                </Link>
+              </li>
+              <li>
+                <Link 
                   to="/roadmaps" 
                   className={`block p-4 rounded-lg ${isActivePath("/roadmaps") ? "bg-primary/10 text-primary" : ""}`}
                   onClick={toggleMenu}
@@ -135,6 +253,21 @@ export function Navbar() {
                   Resources
                 </Link>
               </li>
+              
+              {isAuthenticated && (
+                <li>
+                  <Link 
+                    to="/profile" 
+                    className={`block p-4 rounded-lg ${isActivePath("/profile") ? "bg-primary/10 text-primary" : ""}`}
+                    onClick={toggleMenu}
+                  >
+                    <div className="flex items-center">
+                      <User className="h-5 w-5 mr-2" />
+                      Profile
+                    </div>
+                  </Link>
+                </li>
+              )}
               
               {!isAuthenticated && (
                 <li className="flex flex-col gap-2 mt-4">

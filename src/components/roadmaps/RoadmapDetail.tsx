@@ -1,107 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Clock, Calendar, ChevronDown, ChevronUp, CheckCircle, Circle, CheckCheck, BookOpen } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-// Mock roadmap weeks data
-const mockWeeks = [
-  {
-    id: "w1",
-    week_number: 1,
-    title: "Introduction to HTML & CSS",
-    description: "Learn the basics of HTML5 and CSS3 for web development",
-    status: "completed",
-    xp_reward: 100,
-    steps: [
-      {
-        id: "s1",
-        title: "HTML Basics",
-        status: "completed",
-        resources: [
-          { id: "r1", title: "HTML Fundamentals", type: "video", time: "30 min", completed: true },
-          { id: "r2", title: "HTML Practice Exercise", type: "quiz", time: "15 min", completed: true }
-        ]
-      },
-      {
-        id: "s2",
-        title: "CSS Selectors and Properties",
-        status: "completed",
-        resources: [
-          { id: "r3", title: "CSS Basics Guide", type: "blog", time: "20 min", completed: true },
-          { id: "r4", title: "CSS Challenge", type: "quiz", time: "25 min", completed: true }
-        ]
-      }
-    ]
-  },
-  {
-    id: "w2",
-    week_number: 2,
-    title: "Introduction to JavaScript",
-    description: "Learn fundamental JavaScript concepts for web development",
-    status: "completed",
-    xp_reward: 150,
-    steps: [
-      {
-        id: "s3",
-        title: "JavaScript Variables and Data Types",
-        status: "completed",
-        resources: [
-          { id: "r5", title: "JavaScript Basics", type: "video", time: "45 min", completed: true },
-          { id: "r6", title: "JavaScript Variables Quiz", type: "quiz", time: "20 min", completed: true }
-        ]
-      },
-      {
-        id: "s4",
-        title: "JavaScript Functions",
-        status: "completed",
-        resources: [
-          { id: "r7", title: "Functions in JS", type: "blog", time: "25 min", completed: true },
-          { id: "r8", title: "Functions Challenge", type: "quiz", time: "30 min", completed: true }
-        ]
-      }
-    ]
-  },
-  {
-    id: "w3",
-    week_number: 3,
-    title: "DOM Manipulation",
-    description: "Learn how to interact with HTML using JavaScript",
-    status: "in_progress",
-    xp_reward: 200,
-    steps: [
-      {
-        id: "s5",
-        title: "DOM Selectors",
-        status: "completed",
-        resources: [
-          { id: "r9", title: "DOM Basics", type: "video", time: "40 min", completed: true },
-          { id: "r10", title: "Selector Practice", type: "quiz", time: "20 min", completed: true }
-        ]
-      },
-      {
-        id: "s6",
-        title: "Event Handling",
-        status: "in_progress",
-        resources: [
-          { id: "r11", title: "Event Listeners Guide", type: "blog", time: "30 min", completed: false },
-          { id: "r12", title: "Events Challenge", type: "quiz", time: "25 min", completed: false }
-        ]
-      }
-    ]
-  },
-  {
-    id: "w4",
-    week_number: 4,
-    title: "Introduction to React",
-    description: "Learn the basics of React for building interactive UIs",
-    status: "not_started",
-    xp_reward: 250,
-    steps: []
-  }
-];
+// Define types for roadmap data
+interface Resource {
+  id: string;
+  title: string;
+  type: string;
+  time: string;
+  completed: boolean;
+}
+
+interface Step {
+  id: string;
+  title: string;
+  status: string;
+  resources: Resource[];
+}
+
+interface Week {
+  id: string;
+  week_number: number;
+  title: string;
+  description: string;
+  status: string;
+  xp_reward: number;
+  steps: Step[];
+}
 
 interface RoadmapDetailProps {
   roadmap: {
@@ -113,14 +43,52 @@ interface RoadmapDetailProps {
     progress: number;
     created_at?: string; // Optional since it might not always be available
   };
-  onResourceComplete?: () => void; // Add this prop to the interface
+  weeks?: Week[];
+  onResourceComplete?: () => void;
 }
 
-export default function RoadmapDetail({ roadmap, onResourceComplete }: RoadmapDetailProps) {
-  const [openWeeks, setOpenWeeks] = useState<Record<string, boolean>>({
-    // Default to open the current week
-    [`w${roadmap.current_week}`]: true
-  });
+export default function RoadmapDetail({ roadmap, weeks = [], onResourceComplete }: RoadmapDetailProps) {
+  const [openWeeks, setOpenWeeks] = useState<Record<string, boolean>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [roadmapWeeks, setRoadmapWeeks] = useState<Week[]>(weeks);
+
+  // Fetch weeks data if not provided
+  useEffect(() => {
+    const fetchWeeksData = async () => {
+      if (weeks.length > 0) {
+        setRoadmapWeeks(weeks);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch weeks data for this roadmap
+        const response = await fetch(`/api/roadmaps/${roadmap.id}/weeks`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch roadmap weeks');
+        }
+        const data = await response.json();
+        setRoadmapWeeks(data);
+
+        // Set the current week to be open by default
+        if (data.length > 0) {
+          const currentWeek = data.find(w => w.week_number === roadmap.current_week);
+          if (currentWeek) {
+            setOpenWeeks(prev => ({
+              ...prev,
+              [currentWeek.id]: true
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching roadmap weeks:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWeeksData();
+  }, [roadmap.id, roadmap.current_week, weeks]);
 
   const toggleWeek = (weekId: string) => {
     setOpenWeeks(prev => ({
@@ -193,8 +161,19 @@ export default function RoadmapDetail({ roadmap, onResourceComplete }: RoadmapDe
         </div>
       </div>
       
-      <div className="space-y-4">
-        {mockWeeks.map((week) => (
+      {isLoading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-16 w-full rounded-md" />
+          <Skeleton className="h-16 w-full rounded-md" />
+          <Skeleton className="h-16 w-full rounded-md" />
+        </div>
+      ) : roadmapWeeks.length === 0 ? (
+        <div className="text-center py-8 border rounded-lg">
+          <p className="text-muted-foreground">No content available for this roadmap yet</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {roadmapWeeks.map((week) => (
           <Collapsible
             key={week.id}
             open={openWeeks[week.id] || false}
@@ -325,7 +304,8 @@ export default function RoadmapDetail({ roadmap, onResourceComplete }: RoadmapDe
             </CollapsibleContent>
           </Collapsible>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
